@@ -1,0 +1,58 @@
+[package]
+name = "generals_online_installer"
+version = "1.0.0"
+edition = "2021"
+description = "Native Windows installer for the GeneralsOnline community patch data."
+authors = ["Abdulrahman <https://github.com/abdulrahman20242>"]
+publish = false
+# 1.85 is the actual floor, not a rounded-down guess: it's the release
+# that stabilized `io::ErrorKind::CrossesDevices`, which installer.rs
+# uses to detect a cross-volume move. Cargo will refuse to build this
+# project on an older toolchain instead of failing confusingly deep in
+# installer.rs. (The toolchain this project has actually been built with
+# is 1.97.1, per the last verified build report -- comfortably above
+# this floor.)
+rust-version = "1.85"
+
+# Developed by Abdulrahman
+# GitHub: github.com/abdulrahman20242
+
+[dependencies]
+# HTTP downloading (replaces Python's `requests`). Pure-Rust, blocking
+# (no async runtime), rustls-based TLS on by default -> no OpenSSL/system
+# TLS dependency to manage on Windows.
+ureq = "3"
+
+# ZIP extraction (replaces Python's `zipfile`). `default-features = false`
+# plus `deflate` only, because standard DEFLATE is virtually certain to be
+# the archive's compression method (it's what every common zip tool,
+# including GitHub's own release packaging, uses by default). This drops
+# the crate's bzip2/aes-crypto/lzma/zstd/deflate64/ppmd/xz support, which
+# this installer will never need. If this ever proves wrong for a
+# specific archive, deleting the `default-features`/`features` lines
+# restores full format support at the cost of a larger binary.
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+# Safe, race-free creation of a uniquely named temporary directory
+# (replaces Python's `tempfile.mkdtemp`).
+tempfile = "3"
+
+# Direct Windows Registry access (replaces Python's `winreg`), used only
+# to resolve the real (possibly redirected) Documents folder.
+winreg = "0.56"
+
+[profile.release]
+opt-level = "z"     # optimize for size; this app is I/O-bound (network +
+                    # disk), not compute-bound, so there is no meaningful
+                    # speed cost in practice
+lto = true          # link-time optimization across all crates, enables
+                    # more dead-code elimination
+codegen-units = 1   # trade parallel compile time for a smaller, better
+                    # optimized single codegen unit
+panic = "unwind"    # deliberately NOT "abort" -- see the write-up: an
+                    # unexpected panic must still be able to run the
+                    # temporary-file cleanup guard, matching the Python
+                    # script's `finally` block, which the prompt's
+                    # "regardless of success or failure" wording treats
+                    # as a hard requirement, not a nice-to-have
+strip = true        # strip symbols and debug info from the final binary
