@@ -14,7 +14,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build
+      - name: Check
+        run: cargo check
+
+      - name: Build Release EXE
         run: cargo build --release
 
       - name: Upload EXE
